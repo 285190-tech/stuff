@@ -11,22 +11,22 @@ const WHEEL = [0, 1.5, 0, 2, 0, 1.5, 0, 3, 0, 1.9];
 const GAMES = {
   coinflip(p) {
     const o = ri(2) ? 'heads' : 'tails';
-    return { o: `Landed ${o}`, m: p.pick === o ? 1.98 : 0 };
+    return { o: `Landed ${o}`, m: p.pick === o ? 1.98 : 0, v: { o } };
   },
   dice(p) {
     const t = clamp(p.target, 2, 95), roll = +(r() * 100).toFixed(2);
     const over = p.side === 'over';
     const win = over ? roll > 100 - t : roll < t;
-    return { o: `Rolled ${roll} (${over ? 'over ' + (100 - t) : 'under ' + t})`, m: win ? +(99 / t).toFixed(4) : 0 };
+    return { o: `Rolled ${roll} (${over ? 'over ' + (100 - t) : 'under ' + t})`, m: win ? +(99 / t).toFixed(4) : 0, v: { roll, t, over } };
   },
   limbo(p) {
     const t = clamp(p.target, 1.01, 1000), crash = Math.floor(99 / (1 - r())) / 100;
-    return { o: `Hit ${crash.toFixed(2)}×`, m: crash >= t ? t : 0 };
+    return { o: `Hit ${crash.toFixed(2)}×`, m: crash >= t ? t : 0, v: { crash, t } };
   },
   plinko() {
     let k = 0, path = '';
     for (let i = 0; i < 8; i++) { const b = ri(2); k += b; path += b ? 'R' : 'L'; }
-    return { o: `Path ${path} → slot ${k + 1}`, m: PLINKO[k] };
+    return { o: `Path ${path} → slot ${k + 1}`, m: PLINKO[k], v: { path, k } };
   },
   roulette(p) {
     const n = ri(37), red = REDS.includes(n);
@@ -37,11 +37,11 @@ const GAMES = {
       m = 2;
       win = n > 0 && ({ red, black: !red, odd: n % 2 === 1, even: n % 2 === 0, low: n <= 18, high: n >= 19 })[p.pick];
     }
-    return { o: `Ball landed on ${n} ${n === 0 ? 'green' : red ? 'red' : 'black'}`, m: win ? m : 0 };
+    return { o: `Ball landed on ${n} ${n === 0 ? 'green' : red ? 'red' : 'black'}`, m: win ? m : 0, v: { n, red } };
   },
   wheel() {
     const i = ri(WHEEL.length);
-    return { o: `Wheel stopped on segment ${i + 1}`, m: WHEEL[i] };
+    return { o: `Wheel stopped on segment ${i + 1}`, m: WHEEL[i], v: { i } };
   },
   keno(p) {
     const pk = [...new Set((p.picks || []).map(Number))].filter(n => n >= 1 && n <= 40);
@@ -50,12 +50,12 @@ const GAMES = {
     while (draw.length < 10) draw.push(pool.splice(ri(pool.length), 1)[0]);
     const hits = pk.filter(n => draw.includes(n)).length;
     let prob = 1; for (let i = 0; i < pk.length; i++) prob *= (10 - i) / (40 - i);
-    return { o: `Drew ${draw.sort((a, b) => a - b).join(', ')} — ${hits}/${pk.length} hit`, m: hits === pk.length ? +(0.97 / prob).toFixed(2) : 0 };
+    return { o: `Drew ${draw.sort((a, b) => a - b).join(', ')} — ${hits}/${pk.length} hit`, m: hits === pk.length ? +(0.97 / prob).toFixed(2) : 0, v: { draw, pk } };
   },
   hilo(p) {
     const a = ri(13) + 1, b = ri(13) + 1;
     const win = p.pick === 'hi' ? b > a : b < a; // ties lose
-    return { o: `Card ${a} → ${b}`, m: win ? 2.1 : 0 };
+    return { o: `Card ${a} → ${b}`, m: win ? 2.1 : 0, v: { a, b } };
   },
 };
 
@@ -70,5 +70,5 @@ export async function onRequestPost(c) {
   const pay = Math.floor(bet * x.m);
   p.bal += pay - bet;
   await save(c, sid, p);
-  return out({ o: x.o, m: x.m, pay, win: pay > bet, p }, sid, fresh);
+  return out({ o: x.o, m: x.m, pay, win: pay > bet, v: x.v, p }, sid, fresh);
 }
