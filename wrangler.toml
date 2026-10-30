@@ -1,0 +1,7 @@
+name = "sandbox-casino"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = "public"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
