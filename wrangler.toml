@@ -4,4 +4,4 @@ pages_build_output_dir = "public"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "1696b33280782073882c7bdcb8fcc939"
+id = "e38e9f26d0e94a4c9a79606436ca1697"
