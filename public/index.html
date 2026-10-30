@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sandbox Casino — play money only</title>
+<style>
+:root{--bg:#0f1220;--card:#1a1f36;--ink:#e8eaf6;--mut:#8b91b5;--acc:#ffc233;--ok:#3ddc97;--bad:#ff5c7a}
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header,footer{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+footer{color:var(--mut);font-size:13px;justify-content:center}
+h1{margin:0;font-size:20px}.tag{color:var(--acc);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+main{max-width:960px;margin:0 auto;padding:0 16px 24px;display:grid;gap:16px}
+.card{background:var(--card);border-radius:14px;padding:16px}
+#bal{font-size:28px;color:var(--acc);font-weight:700}
+#lobby{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+button,input,select{font:inherit;color:var(--ink);background:#262c4d;border:1px solid #333a66;border-radius:8px;padding:8px 12px}
+button{cursor:pointer}button:hover{border-color:var(--acc)}button.on{background:var(--acc);color:#111}
+#fields{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0}
+label{display:grid;gap:4px;font-size:13px;color:var(--mut)}
+#grid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;width:100%}
+#grid button{padding:6px 0}
+#play{background:var(--acc);color:#111;font-weight:700;border:0}
+#res{min-height:28px;margin-top:12px;font-weight:600}.ok{color:var(--ok)}.bad{color:var(--bad)}
+ol{margin:0;padding-left:22px}li{padding:2px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+</style></head>
+<body>
+<header>
+  <div><h1>🎰 Sandbox Casino</h1><div class="tag">Play money only · no real money, ever</div></div>
+  <div class="row">
+    <div>Balance <div id="bal">…</div></div>
+    <div style="color:var(--mut)">Peak <b id="peak">…</b></div>
+    <button id="daily">+250 daily</button><button id="reset">Reset to 1,000</button>
+  </div>
+</header>
+<main>
+  <div id="lobby" class="card"></div>
+  <div class="card">
+    <h2 id="title" style="margin:0"></h2>
+    <div id="fields"></div>
+    <div class="row"><label>bet<input id="bet" type="number" min="1" value="10"></label><button id="play">Play</button></div>
+    <div id="res"></div>
+  </div>
+  <div class="card"><b>🏆 Top 20 peak balances</b><ol id="lb"></ol></div>
+</main>
+<footer>Play money only. Credits have no value and cannot be bought, sold or withdrawn.</footer>
+<script>
+const G={
+  coinflip:['Coinflip',[['pick','heads','heads,tails']]],
+  dice:['Dice',[['target',50],['side','under','under,over']]],
+  limbo:['Limbo',[['target',2]]],
+  plinko:['Plinko',[]],
+  roulette:['Roulette',[['pick','red','red,black,odd,even,low,high'],['num','']]],
+  wheel:['Wheel',[]],
+  keno:['Keno (pick 1–5)',[]],
+  hilo:['Hi-Lo',[['pick','hi','hi,lo']]]
+};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let cur='coinflip',picks=new Set(),busy=false;
+
+async function api(path,body){
+  const r=await fetch('/api/'+path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{});
+  return r.json();
+}
+function show(d){
+  if(d.p){$('#bal').textContent=d.p.bal.toLocaleString();$('#peak').textContent=d.p.peak.toLocaleString();}
+  if(d.lb)$('#lb').innerHTML=d.lb.map(x=>`<li>${esc(x.name)} — <b>${x.peak.toLocaleString()}</b></li>`).join('')||'<li>No runs yet — beat 1,000!</li>';
+}
+function panel(){
+  $('#title').textContent=G[cur][0];
+  $('#res').textContent='';
+  $('#fields').innerHTML=G[cur][1].map(([k,v,o])=>`<label>${k}${o
+    ?`<select id="f_${k}">${o.split(',').map(x=>`<option>${x}</option>`).join('')}</select>`
+    :`<input id="f_${k}" value="${v}" type="number" step="any">`}</label>`).join('')
+    +(cur==='keno'?'<div id="grid">'+[...Array(40)].map((_,i)=>`<button data-n="${i+1}">${i+1}</button>`).join('')+'</div>':'');
+  document.querySelectorAll('#lobby button').forEach(b=>b.classList.toggle('on',b.dataset.g===cur));
+}
+$('#lobby').innerHTML=Object.entries(G).map(([k,v])=>`<button data-g="${k}">${v[0].split(' ')[0]}</button>`).join('');
+$('#lobby').onclick=e=>{const g=e.target.dataset.g;if(g){cur=g;picks.clear();panel();}};
+$('#fields').onclick=e=>{
+  const n=+e.target.dataset.n;if(!n)return;
+  if(picks.has(n))picks.delete(n);else if(picks.size<5)picks.add(n);
+  e.target.classList.toggle('on',picks.has(n));
+};
+$('#play').onclick=async()=>{
+  if(busy)return;busy=true;
+  const params={picks:[...picks]};
+  G[cur][1].forEach(([k])=>params[k]=$('#f_'+k).value);
+  const d=await api('play',{game:cur,bet:+$('#bet').value,params});
+  busy=false;
+  const res=$('#res');
+  if(d.error){res.className='bad';res.textContent=d.error;return;}
+  res.className=d.win?'ok':'bad';
+  res.textContent=`${d.o} — ${d.pay>0?'paid '+d.pay:'lost'} (${d.m}×)`;
+  show(await api('state'));
+};
+$('#daily').onclick=async()=>{const d=await api('state',{action:'daily'});if(d.error)alert(d.error);show(d);};
+$('#reset').onclick=async()=>{if(confirm('Reset balance to 1,000?'))show(await api('state',{action:'reset'}));};
+panel();api('state').then(show);
+</script>
+</body></html>
