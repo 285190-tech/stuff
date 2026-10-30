@@ -23,6 +23,18 @@ label{display:grid;gap:4px;font-size:13px;color:var(--mut)}
 #res{min-height:28px;margin-top:12px;font-weight:600}.ok{color:var(--ok)}.bad{color:var(--bad)}
 ol{margin:0;padding-left:22px}li{padding:2px 0}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+#stage{min-height:170px;margin-top:12px;text-align:center}
+.coin{width:90px;height:90px;border-radius:50%;background:#444;display:grid;place-items:center;font:700 36px system-ui;color:#111;margin:30px auto}
+.spin{animation:sp .3s linear 3}@keyframes sp{to{transform:rotateY(360deg)}}
+.bar{position:relative;height:36px;background:#262c4d;border-radius:8px;margin:60px 8px 0}
+.zone{position:absolute;top:0;bottom:0;background:#3ddc9760;border-radius:8px}
+.mark{position:absolute;top:-34px;left:0;transform:translateX(-50%);transition:left .8s;background:var(--acc);color:#111;padding:2px 8px;border-radius:6px;font-weight:700}
+.big{font:700 56px system-ui;margin:40px 0 4px}
+.svg{max-width:420px;width:100%}
+#kg{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;max-width:420px;margin:auto}
+.kc{padding:6px 0;border-radius:6px;background:#262c4d;font-size:13px}.kc.pk{outline:2px solid var(--acc)}.kc.dr{background:#4a5190}.kc.hit{background:var(--ok);color:#111;font-weight:700}
+.cards{display:flex;gap:16px;justify-content:center;margin-top:24px}
+.card2{width:80px;height:110px;border-radius:10px;background:#f4f4f8;color:#111;display:grid;place-items:center;font:700 34px system-ui}
 </style></head>
 <body>
 <header>
@@ -39,7 +51,7 @@ ol{margin:0;padding-left:22px}li{padding:2px 0}
     <h2 id="title" style="margin:0"></h2>
     <div id="fields"></div>
     <div class="row"><label>bet<input id="bet" type="number" min="1" value="10"></label><button id="play">Play</button></div>
-    <div id="res"></div>
+    <div id="stage"></div><div id="res"></div>
   </div>
   <div class="card"><b>🏆 Top 20 peak balances</b><ol id="lb"></ol></div>
 </main>
@@ -69,7 +81,7 @@ function show(d){
 }
 function panel(){
   $('#title').textContent=G[cur][0];
-  $('#res').textContent='';
+  $('#res').textContent='';$('#stage').innerHTML='';
   $('#fields').innerHTML=G[cur][1].map(([k,v,o])=>`<label>${k}${o
     ?`<select id="f_${k}">${o.split(',').map(x=>`<option>${x}</option>`).join('')}</select>`
     :`<input id="f_${k}" value="${v}" type="number" step="any">`}</label>`).join('')
@@ -83,14 +95,61 @@ $('#fields').onclick=e=>{
   if(picks.has(n))picks.delete(n);else if(picks.size<5)picks.add(n);
   e.target.classList.toggle('on',picks.has(n));
 };
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const MULT=[5.6,2.1,1.1,1,0.5,1,1.1,2.1,5.6],WH=[0,1.5,0,2,0,1.5,0,3,0,1.9];
+const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+const rc=n=>n===0?'#2fb36b':RED.includes(n)?'#e5384f':'#222';
+const cl=n=>({1:'A',11:'J',12:'Q',13:'K'}[n]||n);
+async function anim(g,v,win){
+  const s=$('#stage');
+  if(g==='coinflip'){
+    s.innerHTML='<div class="coin spin" id="coin">?</div>';await sleep(950);
+    const c=$('#coin');c.classList.remove('spin');c.textContent=v.o==='heads'?'H':'T';c.style.background=v.o==='heads'?'var(--acc)':'#9aa3d6';
+  }
+  if(g==='dice'){
+    s.innerHTML=`<div class="bar"><div class="zone" style="left:${v.over?100-v.t:0}%;width:${v.t}%"></div><div class="mark" id="mk">0</div></div>`;
+    await sleep(60);const m=$('#mk');m.style.left=v.roll+'%';m.textContent=v.roll;await sleep(900);
+  }
+  if(g==='limbo'){
+    for(let i=0;i<=20;i++){s.innerHTML=`<div class="big" style="color:${i<20?'var(--ink)':win?'var(--ok)':'var(--bad)'}">${(1+(v.crash-1)*i/20).toFixed(2)}×</div><div style="color:var(--mut)">target ${v.t}×</div>`;await sleep(45);}
+  }
+  if(g==='plinko'){
+    let h='<svg viewBox="0 0 300 200" class="svg">';
+    for(let i=0;i<8;i++)for(let j=0;j<=i;j++)h+=`<circle cx="${150+30*(j-i/2)}" cy="${28+18*i}" r="2.5" fill="#8b91b5"/>`;
+    MULT.forEach((m,k)=>h+=`<g id="sl${k}"><rect x="${150+30*(k-4)-13}" y="176" width="26" height="18" rx="4" fill="#262c4d"/><text x="${150+30*(k-4)}" y="189" text-anchor="middle" font-size="9" fill="#e8eaf6">${m}×</text></g>`);
+    s.innerHTML=h+'<circle id="ball" r="5" fill="#ffc233" cx="150" cy="8" style="transition:transform .22s"/></svg>';
+    const b=$('#ball');let x=0;
+    for(let i=0;i<8;i++){x+=v.path[i]==='R'?15:-15;await sleep(240);b.style.transform=`translate(${x}px,${28+18*i+9-8}px)`;}
+    await sleep(250);$('#sl'+v.k+' rect').setAttribute('fill','#ffc233');$('#sl'+v.k+' text').setAttribute('fill','#111');
+  }
+  if(g==='roulette'){
+    s.innerHTML='<div class="coin" id="rb" style="color:#fff"></div>';const b=$('#rb');
+    for(let i=0;i<16;i++){const n=i<15?Math.floor(Math.random()*37):v.n;b.textContent=n;b.style.background=rc(n);await sleep(70+i*14);}
+  }
+  if(g==='wheel'){
+    let h='<svg viewBox="0 0 300 210" class="svg"><g id="wg" style="transform-origin:150px 110px;transition:transform 1.8s cubic-bezier(.15,.7,.2,1)">';
+    WH.forEach((m,i)=>{const pt=(a,r)=>[150+r*Math.cos(a*Math.PI/180),110+r*Math.sin(a*Math.PI/180)],a0=i*36-90,[x1,y1]=pt(a0,90),[x2,y2]=pt(a0+36,90),[tx,ty]=pt(a0+18,62);
+      h+=`<path d="M150 110L${x1} ${y1}A90 90 0 0 1 ${x2} ${y2}Z" fill="${m?(i%4===1?'#3ddc97':'#4a8cff'):'#333a66'}" stroke="#0f1220"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${m}×</text>`;});
+    s.innerHTML=h+'</g><path d="M142 4h16l-8 18z" fill="#ffc233"/></svg>';
+    await sleep(60);$('#wg').style.transform=`rotate(${1440-(v.i*36+18)}deg)`;await sleep(1900);
+  }
+  if(g==='keno'){
+    s.innerHTML='<div id="kg">'+[...Array(40)].map((_,i)=>`<span id="k${i+1}" class="kc ${v.pk.includes(i+1)?'pk':''}">${i+1}</span>`).join('')+'</div>';
+    for(const n of v.draw){await sleep(130);$('#k'+n).classList.add(v.pk.includes(n)?'hit':'dr');}
+  }
+  if(g==='hilo'){
+    s.innerHTML=`<div class="cards"><div class="card2">${cl(v.a)}</div><div class="card2" id="c2">?</div></div>`;
+    await sleep(800);$('#c2').textContent=cl(v.b);await sleep(250);
+  }
+}
 $('#play').onclick=async()=>{
   if(busy)return;busy=true;
   const params={picks:[...picks]};
   G[cur][1].forEach(([k])=>params[k]=$('#f_'+k).value);
   const d=await api('play',{game:cur,bet:+$('#bet').value,params});
-  busy=false;
   const res=$('#res');
-  if(d.error){res.className='bad';res.textContent=d.error;return;}
+  if(d.error){busy=false;res.className='bad';res.textContent=d.error;return;}
+  res.textContent='';await anim(cur,d.v,d.win);busy=false;
   res.className=d.win?'ok':'bad';
   res.textContent=`${d.o} — ${d.pay>0?'paid '+d.pay:'lost'} (${d.m}×)`;
   show(await api('state'));
