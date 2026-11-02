@@ -26,6 +26,7 @@ export async function save(c, sid, p) {
 export const lbGet = c => c.env.KV.get('lb', 'json').then(x => x || []);
 
 export function out(data, sid, fresh, status = 200) {
+  if (data.p) { const { s, ...rest } = data.p; data = { ...data, p: rest }; }
   const h = new Headers({ 'content-type': 'application/json' });
   if (fresh) h.append('set-cookie', `sid=${sid}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`);
   return new Response(JSON.stringify(data), { status, headers: h });
