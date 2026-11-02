@@ -52,6 +52,24 @@ const GAMES = {
     let prob = 1; for (let i = 0; i < pk.length; i++) prob *= (10 - i) / (40 - i);
     return { o: `Drew ${draw.sort((a, b) => a - b).join(', ')} — ${hits}/${pk.length} hit`, m: hits === pk.length ? +(0.97 / prob).toFixed(2) : 0, v: { draw, pk } };
   },
+  baccarat(p) {
+    const val = n => (n >= 10 ? 0 : n), card = () => ri(13) + 1;
+    const tot = h => h.reduce((a, x) => a + val(x), 0) % 10;
+    const P = [card(), card()], B = [card(), card()];
+    let pt = tot(P), bt = tot(B);
+    if (pt < 8 && bt < 8) {
+      let p3 = null;
+      if (pt <= 5) { p3 = card(); P.push(p3); }
+      const v3 = p3 === null ? -1 : val(p3);
+      const draw = p3 === null ? bt <= 5
+        : bt <= 2 || (bt === 3 && v3 !== 8) || (bt === 4 && v3 >= 2 && v3 <= 7) || (bt === 5 && v3 >= 4 && v3 <= 7) || (bt === 6 && (v3 === 6 || v3 === 7));
+      if (draw) B.push(card());
+      pt = tot(P); bt = tot(B);
+    }
+    const w = pt > bt ? 'player' : bt > pt ? 'banker' : 'tie';
+    const m = p.pick === 'tie' ? (w === 'tie' ? 9 : 0) : w === 'tie' ? 1 : p.pick === w ? (w === 'banker' ? 1.95 : 2) : 0;
+    return { o: `Player ${pt} vs Banker ${bt} — ${w}${w === 'tie' && p.pick !== 'tie' ? ' (push)' : ''}`, m, v: { P, B } };
+  },
   hilo(p) {
     const a = ri(13) + 1, b = ri(13) + 1;
     const win = p.pick === 'hi' ? b > a : b < a; // ties lose
