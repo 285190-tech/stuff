@@ -8,7 +8,7 @@ export async function onRequestGet(c) {
 export async function onRequestPost(c) {
   const { sid, p, fresh } = await load(c);
   const { action } = await c.request.json().catch(() => ({}));
-  if (action === 'reset') p.bal = 1000; // peak (best run) is kept
+  if (action === 'reset') { p.bal = 1000; p.s = null; } // peak (best run) is kept
   else if (action === 'daily') {
     if (Date.now() - p.bonus < 864e5) return out({ error: 'Daily bonus not ready yet', p }, sid, fresh, 400);
     p.bal += 250; p.bonus = Date.now();
