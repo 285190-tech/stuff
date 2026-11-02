@@ -44,6 +44,8 @@ ol{margin:0;padding-left:22px}li{padding:2px 0}
 .kc.dr,.kc.hit{animation:pop .3s}@keyframes pop{50%{transform:scale(1.5)}}
 .card2{transition:none}.back{background:repeating-linear-gradient(45deg,#3b4aa8,#3b4aa8 6px,#2b3787 6px,#2b3787 12px)!important;color:transparent!important}
 .fl{animation:fl .5s}@keyframes fl{from{transform:rotateY(90deg)}}
+.sm{width:58px;height:82px;font-size:22px}.cards{flex-wrap:wrap}
+#mg{display:grid;grid-template-columns:repeat(5,64px);gap:6px;justify-content:center}#mg button{height:64px;font-size:26px;padding:0}
 </style></head>
 <body>
 <header>
@@ -60,7 +62,7 @@ ol{margin:0;padding-left:22px}li{padding:2px 0}
     <h2 id="title" style="margin:0"></h2>
     <div id="fields"></div>
     <div class="row"><label>bet<input id="bet" type="number" min="1" value="10"></label><button id="play">Play</button></div>
-    <div id="stage"></div><div id="res"></div>
+    <div id="stage"></div><div id="lv" class="row" style="margin-top:10px"></div><div id="res"></div>
   </div>
   <div class="card"><b>🏆 Top 20 peak balances</b><ol id="lb"></ol></div>
 </main>
@@ -74,7 +76,11 @@ const G={
   roulette:['Roulette',[['pick','red','red,black,odd,even,low,high'],['num','']]],
   wheel:['Wheel',[]],
   keno:['Keno (pick 1–5)',[]],
-  hilo:['Hi-Lo',[['pick','hi','hi,lo']]]
+  hilo:['Hi-Lo',[['pick','hi','hi,lo']]],
+  baccarat:['Baccarat',[['pick','player','player,banker,tie']]],
+  crash:['Crash',[]],
+  mines:['Mines',[['mines',3]]],
+  blackjack:['Blackjack',[]]
 };
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -90,7 +96,7 @@ function show(d){
 }
 function panel(){
   $('#title').textContent=G[cur][0];
-  $('#res').textContent='';$('#stage').innerHTML='';
+  $('#res').textContent='';$('#stage').innerHTML='';liveOn=false;runId++;$('#lv').innerHTML='';
   $('#fields').innerHTML=G[cur][1].map(([k,v,o])=>`<label>${k}${o
     ?`<select id="f_${k}">${o.split(',').map(x=>`<option>${x}</option>`).join('')}</select>`
     :`<input id="f_${k}" value="${v}" type="number" step="any">`}</label>`).join('')
@@ -170,14 +176,71 @@ async function anim(g,v,win){
     let hh=0;
     for(const n of v.draw){await sleep(170);const hit=v.pk.includes(n);$('#k'+n).classList.add(hit?'hit':'dr');if(hit)$('#kh').textContent=++hh+' hits';}
   }
+  if(g==='baccarat'){
+    const tt=h=>h.reduce((a,x)=>a+(x>=10?0:x),0)%10,cd=n=>`<div class="card2 sm" style="color:#111">${cl(n)}</div>`;
+    s.innerHTML='<div style="display:flex;justify-content:space-around;margin-top:16px"><div>Player <b id="bpt">0</b><div class="cards" id="bP" style="margin-top:8px"></div></div><div>Banker <b id="bbt">0</b><div class="cards" id="bB" style="margin-top:8px"></div></div></div>';
+    const hp=[],hb=[],seq=[['P',v.P[0]],['B',v.B[0]],['P',v.P[1]],['B',v.B[1]],['P',v.P[2]],['B',v.B[2]]].filter(x=>x[1]);
+    for(const[w,n]of seq){await sleep(600);(w==='P'?hp:hb).push(n);$('#b'+w).insertAdjacentHTML('beforeend',cd(n));$('#bpt').textContent=tt(hp);$('#bbt').textContent=tt(hb);}
+  }
   if(g==='hilo'){
     const card=(n,id,back)=>`<div class="card2 ${back?'back':''}" id="${id}" style="color:${[1,2].includes((n*7)%4)?'#d22':'#111'}">${cl(n)}${SU[(n*7)%4]}</div>`;
     s.innerHTML=`<div class="cards" style="margin-top:36px">${card(v.a,'c1')}<div style="align-self:center;font-size:28px">→</div>${card(v.b,'c2',1)}</div>`;
     await sleep(900);const c=$('#c2');c.classList.remove('back');c.classList.add('fl');await sleep(600);
   }
 }
+let liveOn=false,runId=0;
+const gapi=(game,act,x={})=>api('game',{game,act,...x});
+const lv=h=>{$('#lv').innerHTML=h};
+function endLive(win,msg){liveOn=false;lv('');const r=$('#res');r.className=win?'ok':'bad';r.textContent=msg;fx(win);api('state').then(show)}
+const cH=n=>`<div class="card2 sm" style="color:${[1,2].includes(n/13|0)?'#d22':'#111'}">${cl(n%13+1)}${SU[n/13|0]}</div>`;
+async function startLive(){
+  const res=$('#res');res.textContent='';
+  const d=await gapi(cur,cur==='blackjack'?'deal':'start',{bet:+$('#bet').value,n:$('#f_mines')?+$('#f_mines').value:0});
+  if(d.error){res.className='bad';res.textContent=d.error;return}
+  show(d);
+  if(cur==='crash')runCrash();else if(cur==='mines')runMines();else{liveOn=true;bj(d)}
+}
+async function runCrash(){
+  const id=++runId;liveOn=true;
+  $('#stage').innerHTML='<div class="big" id="cm" style="margin-top:80px">1.00×</div>';
+  lv('<button id="co" style="width:100%;font-size:20px">Cash out</button>');
+  const fin=d=>{if(id!==runId)return;const c=$('#cm');
+    if(d.error||d.crashed){c.textContent='💥 '+(d.point?d.point.toFixed(2)+'×':'');c.style.color='var(--bad)';endLive(false,d.error||`Crashed at ${d.point.toFixed(2)}×`)}
+    else{c.style.color='var(--ok)';c.textContent=d.m.toFixed(2)+'×';endLive(true,`Cashed out at ${d.m.toFixed(2)}× — paid ${d.pay}`)}};
+  $('#co').onclick=async()=>{if(!liveOn)return;liveOn=false;const d=await gapi('crash','cash');show(d);fin(d)};
+  while(liveOn&&id===runId){
+    const d=await gapi('crash','poll');if(!liveOn||id!==runId)break;
+    if(d.crashed||d.error){liveOn=false;show(d);fin(d);break}
+    $('#cm').textContent=d.m.toFixed(2)+'×';await sleep(150);
+  }
+}
+function runMines(){
+  liveOn=true;let lock=false;
+  $('#stage').innerHTML='<div id="mg">'+[...Array(25)].map((_,i)=>`<button data-i="${i}"></button>`).join('')+'</div><div class="big" id="mm" style="font-size:24px;margin:10px 0 0">1.00×</div>';
+  lv('<button id="co" disabled style="width:100%;font-size:18px">Cash out</button>');
+  const rev=(ms,hit)=>ms.forEach(i=>{const b=$(`#mg [data-i="${i}"]`);b.textContent='💣';b.disabled=true;if(i===hit)b.style.background='var(--bad)'});
+  $('#mg').onclick=async e=>{
+    const i=e.target.dataset.i;if(i==null||lock||!liveOn||e.target.disabled)return;
+    lock=true;const d=await gapi('mines','pick',{i});lock=false;
+    if(d.error){endLive(false,d.error);return}show(d);
+    if(d.boom){rev(d.mines,+i);endLive(false,'Boom! Stake lost')}
+    else{e.target.textContent='💎';e.target.disabled=true;$('#mm').textContent=d.m.toFixed(2)+'×';
+      if(d.won){rev(d.mines);endLive(true,`Cleared the board — paid ${d.pay}`)}else $('#co').disabled=false}
+  };
+  $('#co').onclick=async()=>{
+    if(lock||!liveOn)return;lock=true;const d=await gapi('mines','cash');lock=false;
+    if(d.error){endLive(false,d.error);return}show(d);rev(d.mines);endLive(true,`Cashed out at ${d.m.toFixed(2)}× — paid ${d.pay}`);
+  };
+}
+function bj(d){
+  $('#stage').innerHTML=`<div style="margin-top:8px">Dealer ${d.done?d.dt:'?'}</div><div class="cards" style="margin:6px 0 14px">${d.dh.map(cH).join('')}${d.done?'':'<div class="card2 sm back"></div>'}</div><div>You ${d.pt}</div><div class="cards" style="margin:6px 0">${d.ph.map(cH).join('')}</div>`;
+  if(d.done){const L={blackjack:'Blackjack!',win:'You win',push:'Push',lose:'Dealer wins',bust:'Bust'};endLive(d.pay>d.bet,`${L[d.res]} — ${d.pay>0?'paid '+d.pay:'lost'}`);return}
+  lv('<button id="bh">Hit</button><button id="bs">Stand</button>');
+  const act=a=>async()=>{if(!liveOn)return;liveOn=false;const x=await gapi('blackjack',a);liveOn=true;if(x.error){endLive(false,x.error);return}show(x);bj(x)};
+  $('#bh').onclick=act('hit');$('#bs').onclick=act('stand');
+}
 $('#play').onclick=async()=>{
-  if(busy)return;busy=true;
+  if(busy||liveOn)return;if({crash:1,mines:1,blackjack:1}[cur])return startLive();busy=true;
   const params={picks:[...picks]};
   G[cur][1].forEach(([k])=>params[k]=$('#f_'+k).value);
   const d=await api('play',{game:cur,bet:+$('#bet').value,params});
