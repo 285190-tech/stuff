@@ -35,6 +35,15 @@ ol{margin:0;padding-left:22px}li{padding:2px 0}
 .kc{padding:6px 0;border-radius:6px;background:#262c4d;font-size:13px}.kc.pk{outline:2px solid var(--acc)}.kc.dr{background:#4a5190}.kc.hit{background:var(--ok);color:#111;font-weight:700}
 .cards{display:flex;gap:16px;justify-content:center;margin-top:24px}
 .card2{width:80px;height:110px;border-radius:10px;background:#f4f4f8;color:#111;display:grid;place-items:center;font:700 34px system-ui}
+#stage{position:relative;overflow:hidden;border-radius:12px;background:radial-gradient(#232a52,#141830);min-height:240px;padding:10px}
+.win{animation:wn 1s}@keyframes wn{50%{box-shadow:0 0 50px 8px var(--ok) inset}}
+.lose{animation:ls .5s}@keyframes ls{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+.cf{position:absolute;top:-24px;font-size:22px;animation:fall 1.5s ease-in forwards}@keyframes fall{to{transform:translateY(300px) rotate(540deg);opacity:0}}
+.flip{width:96px;height:96px;margin:50px auto 20px}.flip.t{animation:toss 1.4s ease-out}@keyframes toss{50%{transform:translateY(-90px) scale(1.35)}}
+.coin3{width:100%;height:100%;border-radius:50%;display:grid;place-items:center;font:700 40px system-ui;color:#111;background:radial-gradient(circle at 30% 30%,#ffe17a,#e0a100);box-shadow:0 6px 0 #a87400;transition:transform 1.4s cubic-bezier(.2,.8,.3,1)}
+.kc.dr,.kc.hit{animation:pop .3s}@keyframes pop{50%{transform:scale(1.5)}}
+.card2{transition:none}.back{background:repeating-linear-gradient(45deg,#3b4aa8,#3b4aa8 6px,#2b3787 6px,#2b3787 12px)!important;color:transparent!important}
+.fl{animation:fl .5s}@keyframes fl{from{transform:rotateY(90deg)}}
 </style></head>
 <body>
 <header>
@@ -100,46 +109,71 @@ const MULT=[5.6,2.1,1.1,1,0.5,1,1.1,2.1,5.6],WH=[0,1.5,0,2,0,1.5,0,3,0,1.9];
 const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
 const rc=n=>n===0?'#2fb36b':RED.includes(n)?'#e5384f':'#222';
 const cl=n=>({1:'A',11:'J',12:'Q',13:'K'}[n]||n);
+const ORD=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26],SU=['♠','♥','♦','♣'];
+function fx(win){
+  const s=$('#stage');s.classList.remove('win','lose');void s.offsetWidth;s.classList.add(win?'win':'lose');
+  if(win)for(let i=0;i<30;i++){const e=document.createElement('span');e.className='cf';e.textContent=['🪙','✨','🎉'][i%3];e.style.left=Math.random()*95+'%';e.style.animationDelay=Math.random()*.5+'s';s.appendChild(e);}
+}
 async function anim(g,v,win){
   const s=$('#stage');
   if(g==='coinflip'){
-    s.innerHTML='<div class="coin spin" id="coin">?</div>';await sleep(950);
-    const c=$('#coin');c.classList.remove('spin');c.textContent=v.o==='heads'?'H':'T';c.style.background=v.o==='heads'?'var(--acc)':'#9aa3d6';
+    s.innerHTML='<div class="flip t"><div class="coin3" id="c3">?</div></div>';
+    await sleep(30);$('#c3').style.transform='rotateX(1800deg)';await sleep(1500);
+    const hd=v.o==='heads',c=$('#c3');c.textContent=hd?'H':'T';if(!hd)c.style.background='radial-gradient(circle at 30% 30%,#eef,#8d96c4)';
+    s.insertAdjacentHTML('beforeend',`<div class="big" style="font-size:28px;margin:0">${hd?'HEADS':'TAILS'}</div>`);
   }
   if(g==='dice'){
-    s.innerHTML=`<div class="bar"><div class="zone" style="left:${v.over?100-v.t:0}%;width:${v.t}%"></div><div class="mark" id="mk">0</div></div>`;
-    await sleep(60);const m=$('#mk');m.style.left=v.roll+'%';m.textContent=v.roll;await sleep(900);
+    s.innerHTML=`<div class="big" id="dn">--</div><div class="bar" style="margin-top:30px"><div class="zone" style="left:${v.over?100-v.t:0}%;width:${v.t}%"></div><div class="mark" id="mk" style="top:-26px;background:none;padding:0;font-size:22px;color:var(--acc)">▼</div></div><div style="display:flex;justify-content:space-between;color:var(--mut);font-size:12px;margin:4px 8px"><span>0</span><span>50</span><span>100</span></div>`;
+    for(let i=0;i<14;i++){$('#dn').textContent=(Math.random()*100).toFixed(2);await sleep(60);}
+    $('#dn').textContent=v.roll.toFixed(2);$('#mk').style.left=v.roll+'%';await sleep(900);
   }
   if(g==='limbo'){
-    for(let i=0;i<=20;i++){s.innerHTML=`<div class="big" style="color:${i<20?'var(--ink)':win?'var(--ok)':'var(--bad)'}">${(1+(v.crash-1)*i/20).toFixed(2)}×</div><div style="color:var(--mut)">target ${v.t}×</div>`;await sleep(45);}
+    const M=Math.max(v.crash,v.t)*1.1,Y=m=>160-140*Math.log(m)/Math.log(M),N=30;let pts='';
+    s.innerHTML=`<svg viewBox="0 0 300 180" class="svg"><line x1="20" x2="290" y1="${Y(v.t)}" y2="${Y(v.t)}" stroke="#ffc233" stroke-dasharray="4"/><text x="24" y="${Y(v.t)-4}" font-size="10" fill="#ffc233">target ${v.t}×</text><polyline id="pl" fill="none" stroke="#3ddc97" stroke-width="3"/><text id="rk" font-size="20" x="10" y="160">🚀</text></svg><div class="big" id="lm" style="margin:0">1.00×</div>`;
+    for(let i=0;i<=N;i++){const m=1+(v.crash-1)*i/N,x=20+260*i/N;pts+=`${x},${Y(m)} `;$('#pl').setAttribute('points',pts);$('#rk').setAttribute('x',x-8);$('#rk').setAttribute('y',Y(m));$('#lm').textContent=m.toFixed(2)+'×';await sleep(45);}
+    $('#rk').textContent=win?'🏆':'💥';$('#lm').style.color=win?'var(--ok)':'var(--bad)';
   }
   if(g==='plinko'){
+    const col=m=>m>=2?'#ff5c7a':m>=1.1?'#ffc233':m>=1?'#3ddc97':'#4a8cff';
     let h='<svg viewBox="0 0 300 200" class="svg">';
-    for(let i=0;i<8;i++)for(let j=0;j<=i;j++)h+=`<circle cx="${150+30*(j-i/2)}" cy="${28+18*i}" r="2.5" fill="#8b91b5"/>`;
-    MULT.forEach((m,k)=>h+=`<g id="sl${k}"><rect x="${150+30*(k-4)-13}" y="176" width="26" height="18" rx="4" fill="#262c4d"/><text x="${150+30*(k-4)}" y="189" text-anchor="middle" font-size="9" fill="#e8eaf6">${m}×</text></g>`);
-    s.innerHTML=h+'<circle id="ball" r="5" fill="#ffc233" cx="150" cy="8" style="transition:transform .22s"/></svg>';
-    const b=$('#ball');let x=0;
-    for(let i=0;i<8;i++){x+=v.path[i]==='R'?15:-15;await sleep(240);b.style.transform=`translate(${x}px,${28+18*i+9-8}px)`;}
-    await sleep(250);$('#sl'+v.k+' rect').setAttribute('fill','#ffc233');$('#sl'+v.k+' text').setAttribute('fill','#111');
+    for(let i=0;i<8;i++)for(let j=0;j<=i;j++)h+=`<circle id="pg${i}_${j}" cx="${150+30*(j-i/2)}" cy="${28+18*i}" r="2.5" fill="#8b91b5"/>`;
+    MULT.forEach((m,k)=>h+=`<g id="sl${k}"><rect x="${150+30*(k-4)-13}" y="176" width="26" height="18" rx="4" fill="${col(m)}" opacity=".35"/><text x="${150+30*(k-4)}" y="189" text-anchor="middle" font-size="9" fill="#fff">${m}×</text></g>`);
+    s.innerHTML=h+'<circle id="ball" r="5" fill="#ffc233" cx="150" cy="8" style="transition:transform .24s cubic-bezier(.4,0,.6,1.3)"/></svg>';
+    const b=$('#ball');let j=0;
+    for(let i=0;i<8;i++){
+      b.style.transform=`translate(${30*(j-i/2)}px,${28+18*i-8-6}px)`;await sleep(250);
+      const pg=$(`#pg${i}_${j}`);pg.setAttribute('fill','#ffc233');pg.setAttribute('r',5);setTimeout(()=>{pg.setAttribute('fill','#8b91b5');pg.setAttribute('r',2.5)},200);
+      if(v.path[i]==='R')j++;
+    }
+    b.style.transform=`translate(${30*(v.k-4)}px,${176}px)`;await sleep(300);
+    $('#sl'+v.k+' rect').setAttribute('opacity','1');
   }
   if(g==='roulette'){
-    s.innerHTML='<div class="coin" id="rb" style="color:#fff"></div>';const b=$('#rb');
-    for(let i=0;i<16;i++){const n=i<15?Math.floor(Math.random()*37):v.n;b.textContent=n;b.style.background=rc(n);await sleep(70+i*14);}
+    const A=360/37,pt=(a,r)=>{const t=(a-90)*Math.PI/180;return[150+r*Math.cos(t),120+r*Math.sin(t)]};
+    let h='<svg viewBox="0 0 300 240" class="svg"><g id="rw" style="transform-origin:150px 120px;transition:transform 3s cubic-bezier(.1,.6,.2,1)">';
+    ORD.forEach((n,i)=>{const a=pt(i*A-A/2,100),b=pt(i*A+A/2,100),c=pt(i*A+A/2,62),d=pt(i*A-A/2,62);
+      h+=`<path d="M${a}A100 100 0 0 1 ${b}L${c}A62 62 0 0 0 ${d}Z" fill="${rc(n)}" stroke="#0f1220" stroke-width=".6"/><text transform="rotate(${i*A} 150 120)" x="150" y="42" text-anchor="middle" font-size="8" fill="#fff">${n}</text>`;});
+    h+='<circle cx="150" cy="120" r="56" fill="#1a1f36"/></g><g id="bg" style="transform-origin:150px 120px;transition:transform 3s cubic-bezier(.1,.6,.2,1)"><circle id="bl" cx="150" cy="14" r="5" fill="#fff" style="transition:cy 3s"/></g><path d="M144 0h12l-6 10z" fill="#ffc233"/></svg>';
+    s.innerHTML=h+`<div class="big" id="rn" style="font-size:34px;margin:0"></div>`;
+    await sleep(60);$('#rw').style.transform=`rotate(${1440-ORD.indexOf(v.n)*A}deg)`;$('#bg').style.transform='rotate(-1080deg)';$('#bl').style.cy='39px';
+    await sleep(3200);const rn=$('#rn');rn.textContent=v.n;rn.style.cssText+=`display:inline-block;padding:0 20px;border-radius:12px;background:${rc(v.n)}`;
   }
   if(g==='wheel'){
-    let h='<svg viewBox="0 0 300 210" class="svg"><g id="wg" style="transform-origin:150px 110px;transition:transform 1.8s cubic-bezier(.15,.7,.2,1)">';
+    let h='<svg viewBox="0 0 300 210" class="svg"><g id="wg" style="transform-origin:150px 110px;transition:transform 2.2s cubic-bezier(.15,.7,.2,1)">';
     WH.forEach((m,i)=>{const pt=(a,r)=>[150+r*Math.cos(a*Math.PI/180),110+r*Math.sin(a*Math.PI/180)],a0=i*36-90,[x1,y1]=pt(a0,90),[x2,y2]=pt(a0+36,90),[tx,ty]=pt(a0+18,62);
       h+=`<path d="M150 110L${x1} ${y1}A90 90 0 0 1 ${x2} ${y2}Z" fill="${m?(i%4===1?'#3ddc97':'#4a8cff'):'#333a66'}" stroke="#0f1220"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${m}×</text>`;});
-    s.innerHTML=h+'</g><path d="M142 4h16l-8 18z" fill="#ffc233"/></svg>';
-    await sleep(60);$('#wg').style.transform=`rotate(${1440-(v.i*36+18)}deg)`;await sleep(1900);
+    s.innerHTML=h+'</g><circle cx="150" cy="110" r="10" fill="#0f1220"/><path d="M142 4h16l-8 18z" fill="#ffc233"/></svg>';
+    await sleep(60);$('#wg').style.transform=`rotate(${1800-(v.i*36+18)}deg)`;await sleep(2400);
   }
   if(g==='keno'){
-    s.innerHTML='<div id="kg">'+[...Array(40)].map((_,i)=>`<span id="k${i+1}" class="kc ${v.pk.includes(i+1)?'pk':''}">${i+1}</span>`).join('')+'</div>';
-    for(const n of v.draw){await sleep(130);$('#k'+n).classList.add(v.pk.includes(n)?'hit':'dr');}
+    s.innerHTML='<div id="kg">'+[...Array(40)].map((_,i)=>`<span id="k${i+1}" class="kc ${v.pk.includes(i+1)?'pk':''}">${i+1}</span>`).join('')+'</div><div class="big" id="kh" style="font-size:26px;margin:12px 0 0">0 hits</div>';
+    let hh=0;
+    for(const n of v.draw){await sleep(170);const hit=v.pk.includes(n);$('#k'+n).classList.add(hit?'hit':'dr');if(hit)$('#kh').textContent=++hh+' hits';}
   }
   if(g==='hilo'){
-    s.innerHTML=`<div class="cards"><div class="card2">${cl(v.a)}</div><div class="card2" id="c2">?</div></div>`;
-    await sleep(800);$('#c2').textContent=cl(v.b);await sleep(250);
+    const card=(n,id,back)=>`<div class="card2 ${back?'back':''}" id="${id}" style="color:${[1,2].includes((n*7)%4)?'#d22':'#111'}">${cl(n)}${SU[(n*7)%4]}</div>`;
+    s.innerHTML=`<div class="cards" style="margin-top:36px">${card(v.a,'c1')}<div style="align-self:center;font-size:28px">→</div>${card(v.b,'c2',1)}</div>`;
+    await sleep(900);const c=$('#c2');c.classList.remove('back');c.classList.add('fl');await sleep(600);
   }
 }
 $('#play').onclick=async()=>{
@@ -149,7 +183,7 @@ $('#play').onclick=async()=>{
   const d=await api('play',{game:cur,bet:+$('#bet').value,params});
   const res=$('#res');
   if(d.error){busy=false;res.className='bad';res.textContent=d.error;return;}
-  res.textContent='';await anim(cur,d.v,d.win);busy=false;
+  res.textContent='';await anim(cur,d.v,d.win);fx(d.win);busy=false;
   res.className=d.win?'ok':'bad';
   res.textContent=`${d.o} — ${d.pay>0?'paid '+d.pay:'lost'} (${d.m}×)`;
   show(await api('state'));
